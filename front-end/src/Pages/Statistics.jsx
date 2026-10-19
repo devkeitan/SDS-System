@@ -1,50 +1,31 @@
-import React, { useState } from 'react';
+import React from 'react';
 import LineGraph from '../Components/LineGraph';
 import Overview from '../Components/Overview';
 import Pie from '../Components/Pie';
-import Icon from '../Components/Icon';
-import { useNavigate } from 'react-router-dom';
-import { AppBar, Toolbar, Typography, Button } from '@mui/material';
+import TravelStatsSummary from '../Components/TravelStatsSummary';
+import AppShell from '../Components/AppShell';
+import { TRAVEL_NAV_LINKS } from '../config/navLinks';
 
 const Statistics = () => {
-  const [selectedPosition, setSelectedPosition] = useState('All');
-  const [selectedStation, setSelectedStation] = useState('All');
-  const navigate = useNavigate();
-
   return (
-    <>
-      <div className="w-full min-h-screen max-h-full flex flex-col gap-5 bg-white">
-        {/* Header Section */}
-        <AppBar position="static"
-        sx={{ zIndex: (theme) => theme.zIndex.drawer + 1, backgroundColor: '#1e293b' }}>
-        <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-          Travel List
-          </Typography>
-          <Button color="inherit" onClick={() => navigate('/')}>Dashboard</Button>
-          <Button color="inherit" onClick={() => navigate('/travels')}>Travels</Button>
-          <Button color="inherit" onClick={() => navigate('/statistics')}>Statistics</Button>
-        </Toolbar>
-      </AppBar>
-       
-
-        {/* Main Content */}
-        <div className="flex justify-center gap-5 px-5">
-         
-          <div className="flex bg-white/50 backdrop-blur-md border-green-500/30 border rounded-lg justify-center space-x-5 p-5 w-full h-auto">
-            <div className="flex-col space-y-5">
-              <div>
-                <Overview />
-              </div>
-              <div className="flex gap-5">
-                <LineGraph selectedPosition={selectedPosition} selectedStation={selectedStation} />
-                <Pie />
-              </div>
+    <AppShell title="Travel Statistics" navLinks={TRAVEL_NAV_LINKS}>
+      <div className="min-h-full flex justify-center">
+        <div className="flex bg-white/50 backdrop-blur-md border border-brand-navy/20 rounded-lg justify-center p-4 sm:p-5 w-full max-w-[1400px] h-auto">
+          <div className="flex flex-col gap-5 w-full items-center">
+            <div>
+              <Overview />
+            </div>
+            <div>
+              <TravelStatsSummary />
+            </div>
+            <div className="flex flex-wrap gap-5 justify-center w-full">
+              <LineGraph />
+              <Pie />
             </div>
           </div>
         </div>
       </div>
-    </>
+    </AppShell>
   );
 };
 

@@ -2,11 +2,9 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LogIn from './Pages/LogIn';
 import Travels from './Pages/Travels';
-import AdminDashboard from './admin/travel/CreateTravel';
 import Dashboard from './Pages/Dashboard';
 import Statistics from './Pages/Statistics';
 import MainDashboard from './Pages/MainDashboard';
-import AppointmentDashboard from './Pages/appointment/AppointmentDashboard';
 import CreateAppointment from './admin/appointment/CreateAppointment';
 import EditAppointment from './admin/appointment/EditAppointment';
 import AppointmentStatistics from './Pages/appointment/AppointmentStatistics';
@@ -17,8 +15,8 @@ import EditTravel from './admin/travel/EditTravel';
 import CreateOrder from './admin/order_admin/CreateOrder';
 import OrderDashboard from './Pages/order/OrderDashboard';
 import EditOrder from './admin/order_admin/EditOrder';
-import Footer from './Components/Footer'; // make sure path is correct
 import CreateEmployee from './admin/employee/CreateEmployees';
+import RequireAdmin from './auth/RequireAdmin';
 
 const App = () => {
   return (
@@ -29,10 +27,11 @@ const App = () => {
             <Route path="/travelsDashboard" element={<Dashboard />} />
             <Route path="/statistics" element={<Statistics />} />
             <Route path="/travels" element={<Travels />} />
+            <Route path="/login" element={<LogIn />} />
 
             {/* admin travel */}
-            <Route path="/createTravel" element={<CreateTravel />} />
-            <Route path="/editTravel" element={<EditTravel />} />
+            <Route path="/createTravel" element={<RequireAdmin><CreateTravel /></RequireAdmin>} />
+            <Route path="/editTravel" element={<RequireAdmin><EditTravel /></RequireAdmin>} />
             <Route path="/" element={<MainDashboard />} />
 
             {/* SDS appointment system */}
@@ -41,21 +40,20 @@ const App = () => {
 
             {/* SDS order system */}
             <Route path="/orderDashboard" element={<OrderDashboard />} />
-            <Route path="/editOrder" element={<EditOrder />} />
+            <Route path="/editOrder" element={<RequireAdmin><EditOrder /></RequireAdmin>} />
 
             {/* admin appointment system */}
-            <Route path="/createAppointment" element={<CreateAppointment />} />
-            <Route path="/editAppointment" element={<EditAppointment />} />
+            <Route path="/createAppointment" element={<RequireAdmin><CreateAppointment /></RequireAdmin>} />
+            <Route path="/editAppointment" element={<RequireAdmin><EditAppointment /></RequireAdmin>} />
 
             {/* admin main dashboard */}
-            <Route path="/admin" element={<MainDashboardAdmin />} />
+            <Route path="/admin" element={<RequireAdmin><MainDashboardAdmin /></RequireAdmin>} />
 
             {/* admin order system */}
-            <Route path="/createOrder" element={<CreateOrder />} />
-            <Route path="/employees" element={<CreateEmployee />} />
+            <Route path="/createOrder" element={<RequireAdmin><CreateOrder /></RequireAdmin>} />
+            <Route path="/employees" element={<RequireAdmin><CreateEmployee /></RequireAdmin>} />
           </Routes>
         </main>
-        <Footer className="fixed bottom-0 left-0 right-0" />
       </div>
     </Router>
   );

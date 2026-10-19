@@ -6,16 +6,17 @@ import {
   Grid,
   Typography,
   Paper,
-  AppBar,
-  Toolbar,
 } from '@mui/material';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { Autocomplete } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { Save as SaveIcon, UploadFile as UploadFileIcon } from '@mui/icons-material';
 import dayjs from 'dayjs';
 import Swal from 'sweetalert2';
+import axios from 'axios';
+import AppShell from '../../Components/AppShell';
+import { ADMIN_NOTICE_NAV_LINKS } from '../../config/navLinks';
+import { startsWithFirstFilter } from '../../utils/autocompleteFilters';
 
 const CreateOrder = () => {
   const [formData, setFormData] = useState({
@@ -24,19 +25,18 @@ const CreateOrder = () => {
     position: '',
     district: '',
     school: '',
-    dateSigned: null,
+    date_signed: null,
   });
   const [districts, setDistricts] = useState([]);
   const [schools, setSchools] = useState([]);
   const [pdfFile, setPdfFile] = useState(null);
-  const navigate = useNavigate();
   const baseURL = import.meta.env.VITE_API_URL;
 
 useEffect(() => {
   const fetchDistricts = async () => {
     try {
-      const response = await fetch(`${baseURL}/api/schools-w-district`);
-      const data = await response.json();
+      const response = await axios.get(`${baseURL}/api/schools-w-district`);
+      const data = response.data;
 
       // Set schools with district information
       setSchools(
@@ -96,9 +96,50 @@ const handleSchoolChange = (event, newValue) => {
     }));
   };
 
+  // Fires once the admin finishes typing the Name (on blur, not every
+  // keystroke, so this isn't hitting the API mid-type). If this person
+  // already has data on file — either from a previous notice or from the
+  // Employee directory — pre-fill Address/Position/School/District from
+  // it, but only into fields that are still blank, so it never overwrites
+  // something the admin already typed for a genuinely different entry
+  // under a similar name.
+  const handleNameBlur = async () => {
+    const name = formData.name.trim();
+    if (!name) return;
+    try {
+      const res = await axios.get(`${baseURL}/api/orders/lookup`, { params: { name } });
+      if (!res.data.found) return;
+
+      let filledAnything = false;
+      setFormData((prev) => {
+        if (prev.name.trim() !== name) return prev; // name changed again before this resolved
+        const next = { ...prev };
+        if (!next.address && res.data.address) { next.address = res.data.address; filledAnything = true; }
+        if (!next.position && res.data.position) { next.position = res.data.position; filledAnything = true; }
+        if (!next.school && res.data.school) {
+          next.school = res.data.school;
+          next.district = { id: res.data.school.district_id, name: res.data.school.district_name };
+          filledAnything = true;
+        }
+        return next;
+      });
+
+      if (!filledAnything) return; // matched, but every field was already filled in by hand
+
+      Swal.fire({
+        icon: 'info',
+        title: 'Existing record found',
+        text: `Filled in what's on file for "${name}" (from a previous notice or the employee list). Review before submitting.`,
+        timer: 3500,
+        showConfirmButton: true,
+      });
+    } catch (err) {
+      console.error('Name lookup failed:', err);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Form Data:', formData);
 
     // Create FormData object to handle file and other form data
     const data = new FormData();
@@ -115,93 +156,68 @@ const handleSchoolChange = (event, newValue) => {
     }
 
     try {
-      const response = await fetch(`${baseURL}/api/orders`, {
-        method: 'POST',
-        body: data,
-      });
+      // axios (not fetch) so the app-wide Authorization header set at login
+      // actually gets attached — this endpoint requires it.
+      await axios.post(`${baseURL}/api/orders`, data);
 
-      if (response.status === 409) {
+      Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Notice created successfully!',
+      });
+      // Reset form fields
+      setFormData({
+        name: '',
+        address: '',
+        position: '',
+        district: '',
+        school: '',
+        date_signed: null,
+      });
+      setPdfFile(null);
+    } catch (error) {
+      if (error.response?.status === 409) {
         // Duplication error
-        const result = await response.json();
         Swal.fire({
           icon: 'error',
           title: 'Duplicate Notice',
-          text: result.error,
+          text: error.response.data.error,
         });
         return;
       }
 
-      if (response.ok) {
-        const result = await response.json();
-        Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Notice created successfully!',
-        });
-        // Reset form fields
-        setFormData({
-          name: '',
-          address: '',
-          position: '',
-          district: '',
-          school: '',
-          date_signed: null,
-        });
-        setPdfFile(null);
-      } else {
-        // Show actual error from backend if available
-        const result = await response.json();
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: result.error || 'Failed to create notice.',
-        });
-      }
-    } catch (error) {
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'An error occurred. Please try again.',
+        text: error.response
+          ? error.response.data?.error || 'Failed to create notice.'
+          : 'An error occurred. Please try again.',
       });
     }
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5' }}>
-      {/* Header */}
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Admin - Create Notice
-          </Typography>
-          <Button color="inherit" onClick={() => navigate('/admin')}>Dashboard</Button>
-          <Button color="inherit" onClick={() => navigate('/editOrder')}>Notices</Button>
-          <Button color="inherit" onClick={() => navigate('/createOrder')}>Create Notice</Button>
-        </Toolbar>
-      </AppBar>
-
+    <AppShell title="Create Notice" navLinks={ADMIN_NOTICE_NAV_LINKS} showLogout>
       {/* Form */}
-      <Box sx={{ maxWidth: 830, margin: 'auto', padding: 4, display: 'flex', justifyContent: 'space-between' }}>
-        <Paper elevation={3} sx={{ padding: 4 }}>
-          <Typography variant="h5" gutterBottom>
-            Create Notice
-          </Typography>
+      <Box sx={{ width: '100%', maxWidth: 1400, margin: 'auto', padding: { xs: 2, sm: 4 }, display: 'flex', justifyContent: 'center' }}>
+        <Paper elevation={2} sx={{ padding: { xs: 3, sm: 4 }, width: '100%' }}>
           <form onSubmit={handleSubmit}>
             <Grid container spacing={2}>
               {/* Name Field */}
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
                   label="Name"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
+                  onBlur={handleNameBlur}
                   required
                 />
               </Grid>
 
               {/* Address Field */}
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
                   label="Address"
@@ -213,7 +229,7 @@ const handleSchoolChange = (event, newValue) => {
               </Grid>
 
               {/* Position Field */}
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
                   label="Position"
@@ -227,12 +243,13 @@ const handleSchoolChange = (event, newValue) => {
              
 
               {/* School Field */}
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Autocomplete
     sx={{ minWidth: 223 }}
     disablePortal
     options={schools}
     getOptionLabel={(option) => option.name}
+    filterOptions={startsWithFirstFilter((option) => option.name)}
     value={formData.school || null} // Ensure value is null if no school is selected
     onChange={handleSchoolChange} // Use the updated function
     renderInput={(params) => (
@@ -242,7 +259,7 @@ const handleSchoolChange = (event, newValue) => {
               </Grid>
 
                {/* District Field */}
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
               <Autocomplete
   sx={{ minWidth: 223 }}
   disablePortal
@@ -264,7 +281,7 @@ const handleSchoolChange = (event, newValue) => {
           
 
               {/* Date Signed Field */}
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Box sx={{ width: '223px' }}>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
@@ -273,27 +290,30 @@ const handleSchoolChange = (event, newValue) => {
                       onChange={(newValue) =>
                         handleDateChange('date_signed', newValue)
                       }
-                      renderInput={(params) => <TextField {...params} required />}
+                      slotProps={{ textField: { required: true } }}
                     />
                   </LocalizationProvider>
                 </Box>
               </Grid>
 
               {/* Upload PDF Field */}
-              <Grid item xs={12} sm={6}>
-                <Button variant="outlined" component="label">
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Button variant="outlined" component="label" startIcon={<UploadFileIcon />}>
                   Upload PDF
                   <input
                     type="file"
                     name='pdf'
                     accept="application/pdf"
                     hidden
-                    onChange={(e) => setPdfFile(e.target.files[0])}
+                    onChange={(e) => {
+                      setPdfFile(e.target.files[0]);
+                      e.target.value = '';
+                    }}
                   />
                 </Button>
 
                 {pdfFile && (
-    <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic', color: 'gray' }}>
+    <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic', color: 'text.secondary' }}>
       Selected file: {pdfFile.name}
     </Typography>
   )}
@@ -302,14 +322,14 @@ const handleSchoolChange = (event, newValue) => {
 
             {/* Submit Button */}
             <Box mt={3}>
-              <Button type="submit" variant="contained" color="primary" fullWidth>
+              <Button type="submit" variant="contained" color="primary" startIcon={<SaveIcon />} fullWidth>
                 Submit
               </Button>
             </Box>
           </form>
         </Paper>
       </Box>
-    </Box>
+    </AppShell>
   );
 };
 
